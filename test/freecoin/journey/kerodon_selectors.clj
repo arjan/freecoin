@@ -17,3 +17,6 @@
 
 (def transactions-page-body :.func--transactions-page--body)
 (def transactions-page--table-rows [:.func--transactions-page--table :tbody :tr])
+
+(def welcome-page-body :.func--welcome-page--body)
+(def welcome-page--continue-btn :.func--welcome-page--continue-btn)

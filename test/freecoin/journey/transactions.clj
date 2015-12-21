@@ -9,7 +9,8 @@
             [freecoin.db.storage :as s]
             [freecoin.blockchain :as blockchain]
             [freecoin.routes :as routes]
-            [freecoin.config :as c]))
+            [freecoin.config :as c]
+            [clojure.tools.logging :as log]))
 
 (ih/setup-db)
 
@@ -20,20 +21,41 @@
                              :blockchain blockchain}))
 
 (background
-  (soc/request-access-token! anything "sender") => {:user-info {:sub "sender"
-                                                                :email "sender@email.com"}}
-  (soc/request-access-token! anything "recipient") => {:user-info {:sub "recipient"
-                                                                   :email "recipient@email.com"}})
+ (soc/request-access-token! anything "sender") => {:user-info {:sub "sender"
+                                                               :email "sender@email.com"}}
+ (soc/request-access-token! anything "recipient") => {:user-info {:sub "recipient"
+                                                                  :email "recipient@email.com"}}
+ (soc/request-access-token! anything "testrecipient") => {:user-info {:sub "testrecipient"
+                                                                      :email "testrecipient@email.com"}})
 
 (defn sign-up [state auth-code]
   (-> state
       (k/visit (str (routes/absolute-path (c/create-config) :sso-callback) "?code=" auth-code))
-      (kc/check-and-follow-redirect "to account page")))
-
-(def sign-in sign-up)
+      (kc/check-and-follow-redirect "to welcome page")
+      (k/follow [ks/welcome-page--continue-btn])
+      ;; we're on the account page now
+      ))
 
 (defn sign-out [state]
   (k/visit state (routes/absolute-path (c/create-config) :sign-out)))
+
+(defn li [param prefix]
+  (log/info prefix param)
+  param)
+
+(facts "Participant arrives on welcome page after sign-in"
+       (let [memory (atom {})]
+         (-> (k/session test-app)
+
+             (k/visit (str (routes/absolute-path (c/create-config) :sso-callback) "?code=sender"))
+             (kc/check-and-follow-redirect "to welcome page")
+             (kc/check-page-is :sign-in-welcome ks/welcome-page-body)
+             (k/follow [ks/welcome-page--continue-btn])
+             
+             ;;(kc/check-page-is :account ks/account-page-body :uid (kh/recall memory :signup-uid))
+
+             )
+         ))
 
 (facts "Participant can send freecoins to another account"
        (let [memory (atom {})]
@@ -78,7 +100,7 @@
              (kc/selector-matches-count ks/transactions-page--table-rows 1)
              (kc/selector-includes-content [:title] "Transaction list for sender") 
 
-             (sign-in "recipient")
+             (sign-up "recipient")
              (kc/check-page-is :account [ks/account-page-body] :uid (kh/recall memory :recipient-uid))
              (kc/selector-includes-content [ks/account-page--balance] "10")
 
@@ -126,7 +148,7 @@
              (kc/selector-includes-content [ks/transaction-form--error-message] "Recipient: Not found")
 
              )))
-             
+
 
 (facts "Participant can send freecoins to another account by entering PIN. First, PIN is removed from session by visiting 'forget PIN' URL"
        (let [memory (atom {})]

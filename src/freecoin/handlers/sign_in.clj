@@ -26,21 +26,29 @@
 ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 (ns freecoin.handlers.sign-in
-  (:require [liberator.core :as lc]
-            [liberator.representation :as lr]
-            [ring.util.response :as r]
-            [clojure.string :as s]
-            [stonecutter-oauth.client :as soc]
+  (:require [clojure.string :as s]
+            [clojure.string :as str]
+            [clojure.tools.logging :as log]
+            [freecoin.blockchain :as blockchain]
             [freecoin.config :as config]
-            [freecoin.routes :as routes]
+            [freecoin.context-helpers :as ch]
             [freecoin.db.uuid :as uuid]
             [freecoin.db.wallet :as wallet]
             [freecoin.blockchain :as blockchain]
             [freecoin.context-helpers :as ch]
             [freecoin.auth :as auth]
+            [freecoin.routes :as routes]
             [freecoin.views :as fv]
+            [freecoin.views.index-page :as index-page]
             [freecoin.views.landing-page :as landing-page]
-            [freecoin.views.index-page :as index-page]))
+            [freecoin.views.welcome-page :as welcome-page]
+            [liberator.core :as lc]
+            [liberator.representation :as lr]
+            [ring.util.response :as r]
+            [stonecutter-oauth.client :as soc]))
+
+(defn preserve-session [response request]
+  (assoc response :session (:session request)))
 
 (lc/defresource index-page
   :allowed-methods [:get]
@@ -76,6 +84,10 @@
 (defn wallet->access-key [blockchain wallet]
   (let [secret (get-in wallet [:blockchain-secrets (blockchain/label blockchain)])]
     (s/join "::" [(:cookie secret) (:_id secret)])))
+
+(defn li [param prefix]
+  (log/info prefix param)
+  param)
 
 (lc/defresource sso-callback [wallet-store blockchain sso-config]
   :allowed-methods [:get]
@@ -118,17 +130,42 @@
                    {::uid (:uid wallet)
                     ::cookie-data apikey}))))
 
-  :handle-ok (fn [ctx]
-               (lr/ring-response
-                (cond-> (r/redirect (routes/absolute-path (config/create-config) :account :uid (::uid ctx)))
-                  (::cookie-data ctx) (assoc-in [:session :cookie-data] (::cookie-data ctx))
-                  true (assoc-in [:session :signed-in-uid] (::uid ctx)))))
-  :handle-not-found (-> (routes/absolute-path (config/create-config) :landing-page)
-                        r/redirect
-                        lr/ring-response))
+  :handle-ok
+  (fn [ctx]
+    (->
+     (if (::cookie-data ctx)
+                  ;; new account
+                  (routes/absolute-path (config/create-config) :sign-in-welcome)
+                  ;; existing account
+                  (routes/absolute-path (config/create-config) :account :uid (::uid ctx))
+                  )
+     (r/redirect)
+     (cond-> 
+         (::cookie-data ctx) (assoc-in [:session :cookie-data] (::cookie-data ctx))) 
 
-(defn preserve-session [response request]
-  (assoc response :session (:session request)))
+     (assoc-in [:session :signed-in-uid] (::uid ctx))     
+     (li "resp2")
+
+     (lr/ring-response)))
+  
+  :handle-not-found
+  (-> (routes/absolute-path (config/create-config) :landing-page)
+      r/redirect
+      lr/ring-response))
+
+(lc/defresource sign-in-welcome [wallet-store]
+  :allowed-methods [:get]
+  :available-media-types ["text/html"]
+
+  :authorized? #(auth/is-signed-in %)
+
+  :exists? #(auth/has-wallet % wallet-store)
+
+  :handle-ok
+  (fn [ctx]
+    (-> {:wallet (::wallet ctx) :secret (:cookie-data (:request ctx))}
+        welcome-page/build
+        fv/render-page)))
 
 (lc/defresource sign-out
   :allowed-methods [:get]
@@ -154,3 +191,4 @@
         (preserve-session (:request ctx))
         (update-in [:session] dissoc :cookie-data)
         lr/ring-response)))
+

@@ -72,7 +72,7 @@
                           response (-> (rmr/request :get "/sso-callback")
                                        (assoc :params {:code ...auth-code...})
                                        callback-handler)]
-                      response => (th/check-redirects-to (absolute-path :account :uid "a-uuid"))
+                      response => (th/check-redirects-to (absolute-path :sign-in-welcome))
                       response => (th/check-signed-in-as "a-uuid")
                       response => th/check-has-wallet-key
                       (test-store/entry-count wallet-store) => 1))
