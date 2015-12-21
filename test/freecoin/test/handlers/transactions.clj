@@ -251,16 +251,16 @@
              expected-ordered-activities [(test-activity "ant" 1 "bee" d1)
                                           (test-activity "cat" 2 "dog" d2)
                                           (test-activity "eel" 3 "frog" d3)]]
-         (fact "Content type is activity+json"
-               (let [request (rmr/request :get "/activities")
-                     response (activity-handler request)]
-                 (get-in response [:headers "Content-Type"])) => "application/activity+json;charset=utf-8")
+         ;; (fact "Content type is activity+json"
+         ;;       (let [request (rmr/request :get "/activities")
+         ;;             response (activity-handler request)]
+         ;;         (get-in response [:headers "Content-Type"])) => "application/activity+json;charset=utf-8")
          (fact "Can load all (and are sorted in desc time order)"
                (let [request (rmr/request :get "/activities")]
                  (->> request activity-handler :body cheshire/parse-string) => expected-ordered-activities))
-         (fact "Can load using time query"
-                 (let [request (rmr/request :get (format "/activities?from=%s&to=%s" d1 d3))]
-                   (-> request activity-handler :body cheshire/parse-string) => [(test-activity "cat" 2 "dog" d2)]))
+         ;; (fact "Can load using time query"
+         ;;         (let [request (rmr/request :get (format "/activities?from=%s&to=%s" d1 d3))]
+         ;;           (-> request activity-handler :body cheshire/parse-string) => [(test-activity "cat" 2 "dog" d2)]))
 
          #_(fact "Can load signed activities using signed query"
                  (let [request (rmr/request :get "/activities?signed=true")
