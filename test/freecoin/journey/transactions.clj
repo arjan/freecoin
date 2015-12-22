@@ -6,6 +6,7 @@
             [freecoin.journey.kerodon-checkers :as kc]
             [freecoin.journey.kerodon-helpers :as kh]
             [freecoin.test-helpers.integration :as ih]
+            [clojure.tools.logging :as log]
             [freecoin.db.storage :as s]
             [freecoin.blockchain :as blockchain]
             [freecoin.routes :as routes]
@@ -20,15 +21,21 @@
                              :blockchain blockchain}))
 
 (background
-  (soc/request-access-token! anything "sender") => {:user-info {:sub "sender"
-                                                                :email "sender@email.com"}}
-  (soc/request-access-token! anything "recipient") => {:user-info {:sub "recipient"
-                                                                   :email "recipient@email.com"}})
+ (soc/request-access-token! anything "sender") => {:user-info {:sub "sender"
+                                                               :email "sender@email.com"}}
+ (soc/request-access-token! anything "recipient") => {:user-info {:sub "recipient"
+                                                                  :email "recipient@email.com"}})
+
+(defn logit [p & [rest]] (log/info "Param:" p rest) p)
 
 (defn sign-up [state auth-code]
   (-> state
       (k/visit (str (routes/absolute-path (c/create-config) :sso-callback) "?code=" auth-code))
-      (kc/check-and-follow-redirect "to account page")))
+      (kc/check-and-follow-redirect "to welcome page")
+      (logit)
+      (kc/check-page-is :sign-in-welcome [ks/welcome-page-body])
+      (k/follow ks/welcome-page-continue-btn)
+      ))
 
 (def sign-in sign-up)
 
@@ -126,7 +133,7 @@
              (kc/selector-includes-content [ks/transaction-form--error-message] "Recipient: Not found")
 
              )))
-             
+
 
 (facts "Participant can send freecoins to another account by entering PIN. First, PIN is removed from session by visiting 'forget PIN' URL"
        (let [memory (atom {})]

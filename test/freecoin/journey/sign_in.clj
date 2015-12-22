@@ -1,6 +1,7 @@
 (ns freecoin.journey.sign-in
   (:require [midje.sweet :refer :all]
             [kerodon.core :as k]
+            [clojure.tools.logging :as log]
             [ring.util.response :as r]
             [stonecutter-oauth.client :as soc]
             [freecoin.journey.kerodon-selectors :as ks]
@@ -48,7 +49,9 @@
        (-> (k/session test-app)
            (k/visit (routes/absolute-path (c/create-config) :sign-in))
            (kc/check-and-follow-redirect "to stonecutter callback")
-           (kc/check-and-follow-redirect "to account page")
+           (kc/check-and-follow-redirect "to welcome page")
+           (kc/check-page-is :sign-in-welcome [ks/welcome-page-body])
+           (k/follow ks/welcome-page-continue-btn)
            (kc/check-page-is :account [ks/account-page-body] :uid "some-uuid")))
 
 (facts "Participant can sign out"
